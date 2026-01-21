@@ -9,7 +9,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.patches import Circle, FancyArrowPatch, Wedge
+from matplotlib.patches import Circle, FancyArrowPatch, Wedge, Line2D
 import seaborn as sns
 from collections import defaultdict
 import time
@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
     <style>
     .main {
@@ -53,25 +53,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class LadybugClockVisualizer:
-    """Creates beautiful clock visualizations with ladybug position"""
+    """Creates beautiful clock visualizations"""
     
     def __init__(self, num_positions=12, start_position=12):
         self.num_positions = num_positions
         self.start_position = start_position
         
     def create_clock_figure(self, visited_positions, current_position, last_position=None, title="Clock Face"):
-        """
-        Create a beautiful clock visualization
-        
-        Args:
-            visited_positions: Set of visited positions
-            current_position: Current ladybug position
-            last_position: Last position to be visited (highlighted)
-            title: Figure title
-            
-        Returns:
-            matplotlib figure object
-        """
+        """Create clock visualization"""
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         
         # Draw circle
@@ -98,7 +87,7 @@ class LadybugClockVisualizer:
                 color = 'lightgray'
                 marker_size = 100
             
-            # Draw position marker
+            # Draw marker
             ax.scatter(x, y, s=marker_size, c=color, zorder=5, alpha=0.7, edgecolors='black', linewidth=2)
             
             # Label
@@ -119,28 +108,77 @@ class LadybugClockVisualizer:
         ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
         
         return fig
+    
+    def create_step_by_step_figure(self, path, visited_positions, last_position, title="Simulation Path"):
+        """Create figure showing the path"""
+        fig, ax = plt.subplots(1, 1, figsize=(12, 10))
+        
+        # Draw circle
+        circle = Circle((0, 0), 1, fill=False, edgecolor='black', linewidth=2)
+        ax.add_patch(circle)
+        
+        # Draw positions
+        for i in range(1, 13):
+            angle = np.pi/2 - i * 2 * np.pi / 12
+            x = np.cos(angle)
+            y = np.sin(angle)
+            
+            if i == 12:
+                color = 'blue'
+                size = 300
+            elif i == last_position:
+                color = 'red'
+                size = 300
+            elif i in visited_positions:
+                color = 'green'
+                size = 200
+            else:
+                color = 'lightgray'
+                size = 100
+            
+            ax.scatter(x, y, s=size, c=color, zorder=5, alpha=0.7, edgecolors='black', linewidth=2)
+            label_x = x * 1.2
+            label_y = y * 1.2
+            ax.text(label_x, label_y, str(i), fontsize=14, ha='center', va='center', fontweight='bold')
+        
+        # Draw path
+        for j in range(len(path) - 1):
+            start_pos = path[j]
+            end_pos = path[j + 1]
+            
+            start_angle = np.pi/2 - start_pos * 2 * np.pi / 12
+            end_angle = np.pi/2 - end_pos * 2 * np.pi / 12
+            
+            start_x = np.cos(start_angle)
+            start_y = np.sin(start_angle)
+            end_x = np.cos(end_angle)
+            end_y = np.sin(end_angle)
+            
+            ax.plot([start_x, end_x], [start_y, end_y], 'k-', alpha=0.3, linewidth=1)
+        
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+        
+        return fig
 
 
 class LadybugSimulator:
-    """Simulates the random walk on a clock face"""
+    """Simulates the random walk"""
     
     def __init__(self, num_positions=12, start_position=12):
         self.num_positions = num_positions
         self.start_position = start_position
     
     def simulate(self, steps_limit=None):
-        """
-        Run one simulation of the ladybug walk
-        
-        Returns:
-            Dictionary with simulation results
-        """
+        """Run one complete simulation"""
         current_pos = self.start_position
         visited = {current_pos}
         path = [current_pos]
         
         while len(visited) < self.num_positions:
-            # Random direction
             direction = random.choice([-1, 1])
             current_pos = ((current_pos - 1 + direction) % self.num_positions) + 1
             visited.add(current_pos)
@@ -149,16 +187,15 @@ class LadybugSimulator:
             if steps_limit and len(path) > steps_limit:
                 break
         
-        last_position = current_pos
         return {
-            'last_position': last_position,
+            'last_position': current_pos,
             'path': path,
             'visited': visited,
             'steps': len(path) - 1
         }
     
     def batch_simulate(self, n_simulations):
-        """Run multiple simulations and return statistics"""
+        """Run multiple simulations"""
         results = defaultdict(int)
         
         for _ in range(n_simulations):
@@ -173,43 +210,58 @@ def main():
     # Title
     st.markdown('<div class="title-text">Ladybug Clock Problem [INTERACTIVE]</div>', 
                 unsafe_allow_html=True)
-    st.markdown('<div class="subtitle-text">Interactive Visualization of a Random Walk Problem</div>', 
+    st.markdown('<div class="subtitle-text">Watch a Ladybug Solve a Random Walk Problem</div>', 
                 unsafe_allow_html=True)
     
     # Sidebar
-    st.sidebar.markdown("## Settings")
+    st.sidebar.markdown("## Select Mode")
     mode = st.sidebar.radio(
-        "Select Mode:",
-        ["Live Simulation", "Batch Simulations", "Statistics", "How It Works"]
+        "Choose what to explore:",
+        ["Live Simulation (Step-by-Step)", "Batch Simulations", "Statistics", "How It Works"],
+        help="Select a mode to interact with the dashboard"
     )
     
-    # Mode 1: Live Simulation
-    if mode == "Live Simulation":
-        st.header("Watch the Ladybug Move in Real-Time")
+    # MODE 1: LIVE SIMULATION WITH STEP-BY-STEP
+    if mode == "Live Simulation (Step-by-Step)":
+        st.header("Live Simulation - Watch Step by Step")
         
-        col1, col2 = st.columns(2)
+        st.write("""
+        Click the button below to run a live simulation. The ladybug starts at position 12 
+        and randomly moves to neighboring positions (clockwise or counterclockwise) until 
+        all 12 numbers are visited.
+        """)
+        
+        col1, col2 = st.columns([1, 1])
         
         with col1:
-            st.subheader("Controls")
-            if st.button("Run One Simulation", key="run_one"):
+            st.subheader("Simulation Controls")
+            
+            if st.button("RUN SIMULATION", key="run_live", use_container_width=True):
                 sim = LadybugSimulator()
                 result = sim.simulate()
                 
-                st.subheader("Simulation Stats")
-                col_metric1, col_metric2 = st.columns(2)
-                with col_metric1:
-                    st.metric("Last Position", result['last_position'])
-                with col_metric2:
-                    st.metric("Total Steps", result['steps'])
+                st.subheader("Results")
                 
-                st.write(f"Positions visited: {sorted(result['visited'])}")
-                st.write(f"Path (first 20 steps): {' → '.join(map(str, result['path'][:20]))}")
-                if len(result['path']) > 20:
-                    st.write(f"... and {len(result['path']) - 20} more steps")
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("Total Steps", result['steps'])
+                with col_b:
+                    st.metric("Last Position", result['last_position'])
+                with col_c:
+                    st.metric("Positions Visited", len(result['visited']))
+                
+                st.subheader("Path Taken")
+                path_str = ' → '.join(map(str, result['path'][:25]))
+                if len(result['path']) > 25:
+                    path_str += f" ... +{len(result['path']) - 25} more"
+                st.text(path_str)
+                
+                st.subheader("All Positions Visited")
+                st.write(f"Order of visits: {', '.join(map(str, result['path']))}")
         
         with col2:
             st.subheader("Clock Visualization")
-            if st.button("Run One Simulation", key="run_vis"):
+            if st.button("VISUALIZE", key="viz_live", use_container_width=True):
                 sim = LadybugSimulator()
                 result = sim.simulate()
                 
@@ -218,131 +270,250 @@ def main():
                     result['visited'],
                     result['last_position'],
                     result['last_position'],
-                    f"Final State - Last Position: {result['last_position']}"
+                    f"Final Result: Position {result['last_position']} was Last!"
                 )
                 st.pyplot(fig)
+                
+                st.success(f"Simulation completed in {result['steps']} steps!")
+        
+        st.divider()
+        
+        st.subheader("Multiple Runs Comparison")
+        if st.button("Compare 10 Simulations", use_container_width=True):
+            results_list = []
+            last_positions = defaultdict(int)
+            
+            progress_bar = st.progress(0)
+            for i in range(10):
+                sim = LadybugSimulator()
+                result = sim.simulate()
+                results_list.append(result)
+                last_positions[result['last_position']] += 1
+                progress_bar.progress((i + 1) / 10)
+            
+            st.subheader("Results from 10 Runs")
+            
+            for pos in sorted(last_positions.keys()):
+                count = last_positions[pos]
+                pct = (count / 10) * 100
+                st.write(f"Position {pos}: {count} times ({pct:.0f}%)")
     
-    # Mode 2: Batch Simulations
+    # MODE 2: BATCH SIMULATIONS
     elif mode == "Batch Simulations":
         st.header("Run Multiple Simulations")
         
-        n_sims = st.slider("Number of simulations", 10, 5000, 100)
+        col1, col2 = st.columns(2)
+        with col1:
+            n_sims = st.slider("Number of simulations", 10, 5000, 100, step=10)
         
-        if st.button("Run Batch"):
+        if st.button("RUN BATCH SIMULATIONS", use_container_width=True):
             sim = LadybugSimulator()
-            results = sim.batch_simulate(n_sims)
             
-            st.subheader("Results")
+            with st.spinner("Running simulations..."):
+                results = sim.batch_simulate(n_sims)
             
-            # Display distribution
-            col1, col2 = st.columns(2)
+            st.subheader("Distribution Results")
+            
+            # Show table
+            col1, col2 = st.columns([1, 2])
             
             with col1:
-                st.write("**Distribution of last positions:**")
+                st.write("**Last Position Counts:**")
                 for pos in sorted(results.keys()):
                     count = results[pos]
                     pct = (count / n_sims) * 100
-                    st.write(f"Position {pos}: {count} times ({pct:.2f}%)")
+                    st.write(f"Pos {pos}: {count} ({pct:.1f}%)")
             
             with col2:
+                st.write("**Visual Distribution:**")
                 # Bar chart
-                import matplotlib.pyplot as plt
-                fig, ax = plt.subplots(figsize=(10, 6))
+                fig, ax = plt.subplots(figsize=(10, 5))
                 positions = sorted(results.keys())
                 counts = [results[p] for p in positions]
-                ax.bar(positions, counts, color='steelblue', edgecolor='black')
-                ax.set_xlabel('Last Position')
-                ax.set_ylabel('Count')
-                ax.set_title(f'Distribution of Last Positions ({n_sims} simulations)')
+                colors = ['red' if p == 6 else 'steelblue' for p in positions]
+                
+                ax.bar(positions, counts, color=colors, edgecolor='black', alpha=0.7)
+                ax.set_xlabel('Last Position', fontsize=12)
+                ax.set_ylabel('Frequency', fontsize=12)
+                ax.set_title(f'Distribution After {n_sims} Simulations', fontsize=14, fontweight='bold')
                 ax.set_xticks(range(1, 13))
+                ax.grid(axis='y', alpha=0.3)
+                
                 st.pyplot(fig)
     
-    # Mode 3: Statistics
+    # MODE 3: STATISTICS
     elif mode == "Statistics":
-        st.header("Statistical Analysis (50,000 Simulations)")
+        st.header("Statistical Analysis")
         
-        if st.button("Run Statistics"):
-            with st.spinner("Running 50,000 simulations..."):
-                sim = LadybugSimulator()
+        st.write("""
+        This mode runs 50,000 simulations to determine the theoretical probability 
+        that each position is the last one visited.
+        """)
+        
+        if st.button("RUN 50,000 SIMULATIONS", use_container_width=True):
+            sim = LadybugSimulator()
+            
+            with st.spinner("Running 50,000 simulations... this takes a moment"):
                 results = sim.batch_simulate(50000)
             
             st.subheader("Results")
             
-            # Probability for position 6
+            # Key finding for position 6
             prob_6 = results[6] / 50000
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.success(f"Probability Position 6 is Last: {prob_6:.6f}")
+                st.metric("Prob Position 6 Last", f"{prob_6:.4f}")
             with col2:
-                st.info(f"As Percentage: {prob_6*100:.2f}%")
+                st.metric("As Percentage", f"{prob_6*100:.2f}%")
             with col3:
-                st.warning(f"Expected: 9.09% (1/11)")
+                st.metric("Expected (Theory)", "9.09% (1/11)")
             
             st.divider()
             
-            # Full distribution
-            st.subheader("Full Distribution")
+            # Full distribution table
+            st.subheader("Complete Distribution (50,000 runs)")
+            
+            dist_data = []
+            for pos in sorted(results.keys()):
+                prob = results[pos] / 50000
+                dist_data.append({
+                    'Position': pos,
+                    'Count': results[pos],
+                    'Probability': f"{prob:.6f}",
+                    'Percentage': f"{prob*100:.2f}%"
+                })
+            
+            st.table(dist_data)
+            
+            # Visualization
+            st.subheader("Probability Distribution Chart")
             
             fig, ax = plt.subplots(figsize=(12, 6))
             positions = sorted(results.keys())
             probabilities = [results[p]/50000 for p in positions]
             
             colors = ['red' if p == 6 else 'steelblue' for p in positions]
-            ax.bar(positions, probabilities, color=colors, edgecolor='black', alpha=0.7)
+            ax.bar(positions, probabilities, color=colors, edgecolor='black', alpha=0.7, label='Simulated')
+            
+            # Theoretical line
             ax.axhline(y=1/11, color='green', linestyle='--', linewidth=2, label='Theoretical (1/11)')
-            ax.set_xlabel('Position')
-            ax.set_ylabel('Probability')
-            ax.set_title('Probability Distribution (50,000 Simulations)')
+            
+            ax.set_xlabel('Position', fontsize=12)
+            ax.set_ylabel('Probability', fontsize=12)
+            ax.set_title('Probability Distribution (50,000 Simulations)', fontsize=14, fontweight='bold')
             ax.set_xticks(range(1, 13))
-            ax.legend()
+            ax.legend(fontsize=11)
             ax.grid(axis='y', alpha=0.3)
             
             st.pyplot(fig)
     
-    # Mode 4: How It Works
+    # MODE 4: HOW IT WORKS
     elif mode == "How It Works":
-        st.header("How It Works")
+        st.header("Understanding the Problem")
         
-        tab1, tab2, tab3, tab4 = st.tabs(["Problem", "Algorithm", "Theory", "Solution"])
+        tab1, tab2, tab3, tab4 = st.tabs(["The Problem", "The Algorithm", "The Theory", "The Answer"])
         
         with tab1:
-            st.subheader("The Problem")
+            st.subheader("The Ladybug Clock Problem")
             st.write("""
-            A ladybug lands on the 12 of a clock and every second moves randomly to a neighboring number 
-            (clockwise or counterclockwise with equal probability). Each number is colored red when visited. 
-            **What is the probability that 6 is the last number to be colored?**
+            A ladybug lands on the **12** of a clock face. Every second, it randomly moves to a 
+            neighboring number (either clockwise or counterclockwise with equal probability).
+            
+            Each number is **colored red** when the ladybug visits it for the first time.
+            
+            **Question:** What is the probability that **6** is the **last** number to be colored?
             """)
+            
+            st.subheader("Visual Representation")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("""
+                **Starting Position:**
+                - Blue circle = Start (position 12)
+                - Gray circles = Unvisited positions
+                - Green circles = Already visited
+                - Red circle = Last to be visited
+                """)
+            
+            with col2:
+                viz = LadybugClockVisualizer()
+                fig = viz.create_clock_figure({12}, 12, None, "Initial State")
+                st.pyplot(fig)
         
         with tab2:
             st.subheader("The Algorithm")
             st.write("""
-            1. Start at position 12
-            2. Randomly choose direction (clockwise or counterclockwise)
-            3. Move to neighboring position
-            4. Mark as visited
-            5. Repeat until all 12 positions visited
+            **Step-by-step process:**
+            
+            1. Start at position 12 on the clock
+            2. Randomly choose a direction (clockwise or counterclockwise)
+            3. Move to the neighboring position
+            4. Mark that position as visited
+            5. Repeat steps 2-4 until all 12 positions are visited
             6. Record which position was visited last
             """)
+            
+            st.code("""
+            current_pos = 12
+            visited = {12}
+            
+            while len(visited) < 12:
+                direction = random choice of [-1, 1]
+                current_pos = move to neighbor
+                visited.add(current_pos)
+            
+            return last_visited_position
+            """, language="python")
         
         with tab3:
             st.subheader("Mathematical Theory")
             st.write("""
-            This is a **random walk covering time** problem on a **cycle graph C12**.
+            This is a **Random Walk on a Cycle Graph** problem.
             
-            By symmetry, all non-starting positions are equally likely to be the last one visited.
-            Since we start at 12, the probability for any other position is: **1/11 ≈ 0.0909 (9.09%)**
+            **Key Insight:** By symmetry, the starting position (12) has no special advantage 
+            in determining which other position is last. Since there are 12 positions total 
+            and position 12 is the start, any of the remaining **11 positions** is equally 
+            likely to be the last one visited.
+            
+            **Therefore:**
+            - Probability that any specific non-starting position is last = **1/11**
+            - For position 6: P(6 is last) = **1/11 ≈ 0.0909 (9.09%)**
+            """)
+            
+            st.subheader("Why This Works")
+            st.write("""
+            The random walk explores the clock uniformly due to the symmetry of the problem.
+            The graph is a cycle, and the walk is **symmetric**. This means:
+            
+            1. Every position except the start is equally likely to be discovered
+            2. The last position to be discovered is uniformly distributed among non-start positions
+            3. This gives each a probability of 1/(n-1) = 1/11
             """)
         
         with tab4:
             st.subheader("The Answer")
-            st.write("""
-            **Answer: 9.09% (exactly 1/11)**
             
-            - Simulated Result (50,000 runs): ~9.01%
-            - Theoretical Result: 9.09%
-            - Error: < 1% ✓
-            """)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.success("""
+                **Answer: 9.09% (exactly 1/11)**
+                
+                **Breakdown:**
+                - Theoretical probability: 1/11 = 0.090909...
+                - As percentage: 9.09%
+                """)
+            
+            with col2:
+                st.info("""
+                **Verification by Simulation:**
+                - 50,000 simulation runs: ~9.01% (slight variation expected)
+                - Error: < 1% ✓
+                
+                This confirms our theoretical analysis!
+                """)
 
 
 if __name__ == "__main__":
@@ -352,6 +523,6 @@ if __name__ == "__main__":
 st.divider()
 st.markdown("""
     <div style="text-align: center; color: #999; font-size: 12px;">
-    [INTERACTIVE] <b>Ladybug Clock Problem</b> | Interactive Streamlit Dashboard | Created for Educational Purposes
+    Ladybug Clock Problem | Interactive Streamlit Dashboard | Educational Project
     </div>
 """, unsafe_allow_html=True)
