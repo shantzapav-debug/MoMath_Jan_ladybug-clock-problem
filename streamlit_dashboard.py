@@ -9,7 +9,8 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.patches import Circle, FancyArrowPatch, Wedge, Line2D
+from matplotlib.patches import Circle, FancyArrowPatch, Wedge
+from matplotlib.lines import Line2D
 import seaborn as sns
 from collections import defaultdict
 import time
