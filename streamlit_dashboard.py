@@ -382,11 +382,21 @@ def main():
             with col1:
                 st.metric("Total Steps", result['steps'])
             with col2:
-                st.metric("Last Position", result['last_position'])
+                if end_position is not None:
+                    st.metric("Stopped At", result['last_position'])
+                else:
+                    st.metric("Last Position", result['last_position'])
             with col3:
                 st.metric("Clockwise Moves", sum(1 for d in directions if d == 1))
             with col4:
                 st.metric("CCW Moves", sum(1 for d in directions if d == -1))
+            
+            # Show visited count
+            visited_count = len(result['visited'])
+            if end_position is not None:
+                st.warning(f"⏹️ Stopped at position {end_position} | Visited {visited_count} positions out of 12")
+            else:
+                st.success(f"✅ Visited all 12 positions")
             
             st.subheader("Full Path Trace with Annotations")
             
