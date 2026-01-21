@@ -275,11 +275,19 @@ def main():
         Adjust the probability settings to change movement patterns!
         """)
         
-        # Probability controls
-        st.subheader("Movement Probability Settings")
-        col1, col2 = st.columns(2)
+        # Probability and position controls
+        st.subheader("Simulation Settings")
+        col1, col2, col3 = st.columns(3)
         
         with col1:
+            start_position = st.selectbox(
+                "Starting Position",
+                options=list(range(1, 13)),
+                index=11,  # Default to 12 (index 11)
+                help="Choose the starting position for the ladybug"
+            )
+        
+        with col2:
             clockwise_prob = st.slider(
                 "Clockwise Probability",
                 min_value=0.0,
@@ -289,15 +297,15 @@ def main():
                 help="Probability of moving clockwise (0 = always counter-clockwise, 1 = always clockwise)"
             )
         
-        with col2:
+        with col3:
             counter_prob = 1 - clockwise_prob
             st.metric("Counter-Clockwise Probability", f"{counter_prob:.1%}")
         
-        st.info(f"⚙️ Clockwise: {clockwise_prob:.1%} | Counter-Clockwise: {counter_prob:.1%}")
+        st.info(f"⚙️ Starting Position: {start_position} | Clockwise: {clockwise_prob:.1%} | Counter-Clockwise: {counter_prob:.1%}")
         
         if st.button("START LIVE SIMULATION", key="run_live_anim", use_container_width=True):
-            # Run simulation with custom probability
-            sim = LadybugSimulator(clockwise_prob=clockwise_prob)
+            # Run simulation with custom probability and starting position
+            sim = LadybugSimulator(start_position=start_position, clockwise_prob=clockwise_prob)
             result = sim.simulate()
             path = result['path']
             directions = result['directions']
@@ -380,7 +388,7 @@ def main():
             n_compare = st.slider("Number of runs to compare", 5, 50, 10, key="compare_slider")
         
         if st.button("COMPARE RUNS", use_container_width=True):
-            sim = LadybugSimulator(clockwise_prob=clockwise_prob)
+            sim = LadybugSimulator(start_position=start_position, clockwise_prob=clockwise_prob)
             last_pos_counts = defaultdict(int)
             
             progress_bar = st.progress(0)
