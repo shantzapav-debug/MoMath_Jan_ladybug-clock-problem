@@ -23,16 +23,6 @@ A ladybug lands on the 12 of a clock and every second moves randomly to a neighb
 - Python 3.7+
 - pip
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/YOUR-USERNAME/ladybug-clock-problem.git
-cd ladybug-clock-problem
-
-# Install dependencies
-pip install -r requirements.txt
-```
 
 ### Run the Dashboard
 
