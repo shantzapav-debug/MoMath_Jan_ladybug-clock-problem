@@ -203,11 +203,12 @@ class LadybugClockVisualizer:
 class LadybugSimulator:
     """Simulates the random walk"""
     
-    def __init__(self, num_positions=12, start_position=12, clockwise_prob=0.5):
+    def __init__(self, num_positions=12, start_position=12, clockwise_prob=0.5, end_position=None):
         self.num_positions = num_positions
         self.start_position = start_position
         self.clockwise_prob = clockwise_prob  # Probability of moving clockwise
         self.counter_clockwise_prob = 1 - clockwise_prob
+        self.end_position = end_position  # Stop when this position is reached
     
     def simulate(self, steps_limit=None):
         """Run one complete simulation"""
@@ -215,6 +216,7 @@ class LadybugSimulator:
         visited = {current_pos}
         path = [current_pos]
         directions = []  # Track directions for annotation
+        reached_end = False
         
         while len(visited) < self.num_positions:
             # Choose direction based on probability
@@ -228,6 +230,11 @@ class LadybugSimulator:
             path.append(current_pos)
             directions.append(direction)
             
+            # Check if we reached the ending position
+            if self.end_position is not None and current_pos == self.end_position:
+                reached_end = True
+                break
+            
             if steps_limit and len(path) > steps_limit:
                 break
         
@@ -236,7 +243,8 @@ class LadybugSimulator:
             'path': path,
             'visited': visited,
             'steps': len(path) - 1,
-            'directions': directions
+            'directions': directions,
+            'reached_end': reached_end
         }
     
     def batch_simulate(self, n_simulations):
@@ -277,7 +285,7 @@ def main():
         
         # Probability and position controls
         st.subheader("Simulation Settings")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             start_position = st.selectbox(
@@ -288,24 +296,34 @@ def main():
             )
         
         with col2:
+            end_position = st.selectbox(
+                "Ending Position (Optional)",
+                options=[None] + list(range(1, 13)),
+                format_func=lambda x: "All Positions" if x is None else str(x),
+                index=6,  # Default to 6 (index 6 in combined list)
+                help="Stop when reaching this position. 'All Positions' = visit all"
+            )
+        
+        with col3:
             clockwise_prob = st.slider(
                 "Clockwise Probability",
                 min_value=0.0,
                 max_value=1.0,
                 value=0.5,
                 step=0.05,
-                help="Probability of moving clockwise (0 = always counter-clockwise, 1 = always clockwise)"
+                help="Probability of moving clockwise"
             )
         
-        with col3:
+        with col4:
             counter_prob = 1 - clockwise_prob
-            st.metric("Counter-Clockwise Probability", f"{counter_prob:.1%}")
+            st.metric("Counter-Clockwise", f"{counter_prob:.1%}")
         
-        st.info(f"⚙️ Starting Position: {start_position} | Clockwise: {clockwise_prob:.1%} | Counter-Clockwise: {counter_prob:.1%}")
+        end_text = f"Position {end_position}" if end_position else "All Positions"
+        st.info(f"⚙️ Start: {start_position} | End: {end_text} | CW: {clockwise_prob:.1%} | CCW: {counter_prob:.1%}")
         
         if st.button("START LIVE SIMULATION", key="run_live_anim", use_container_width=True):
-            # Run simulation with custom probability and starting position
-            sim = LadybugSimulator(start_position=start_position, clockwise_prob=clockwise_prob)
+            # Run simulation with custom probability and positions
+            sim = LadybugSimulator(start_position=start_position, end_position=end_position, clockwise_prob=clockwise_prob)
             result = sim.simulate()
             path = result['path']
             directions = result['directions']
@@ -388,7 +406,7 @@ def main():
             n_compare = st.slider("Number of runs to compare", 5, 50, 10, key="compare_slider")
         
         if st.button("COMPARE RUNS", use_container_width=True):
-            sim = LadybugSimulator(start_position=start_position, clockwise_prob=clockwise_prob)
+            sim = LadybugSimulator(start_position=start_position, end_position=end_position, clockwise_prob=clockwise_prob)
             last_pos_counts = defaultdict(int)
             
             progress_bar = st.progress(0)
