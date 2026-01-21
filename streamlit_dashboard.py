@@ -418,12 +418,17 @@ def main():
     elif mode == "Batch Simulations":
         st.header("Run Multiple Simulations")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             n_sims = st.slider("Number of simulations", 10, 5000, 100, step=10)
+        with col2:
+            cw_prob = st.slider("Clockwise probability", 0.0, 1.0, 0.5, step=0.05, key="batch_cw")
+            ccw_prob = 1.0 - cw_prob
+        with col3:
+            st.metric("Counter-clockwise", f"{ccw_prob:.0%}")
         
         if st.button("RUN BATCH SIMULATIONS", use_container_width=True):
-            sim = LadybugSimulator()
+            sim = LadybugSimulator(clockwise_prob=cw_prob)
             
             with st.spinner("Running simulations..."):
                 results = sim.batch_simulate(n_sims)
@@ -462,20 +467,29 @@ def main():
         st.header("Statistical Analysis")
         
         st.write("""
-        This mode runs 50,000 simulations to determine the theoretical probability 
+        This mode runs simulations to determine the probability 
         that each position is the last one visited.
         """)
         
-        if st.button("RUN 50,000 SIMULATIONS", use_container_width=True):
-            sim = LadybugSimulator()
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            n_stats = st.slider("Number of simulations", 1000, 50000, 10000, step=1000, key="stats_n")
+        with col2:
+            cw_prob_stats = st.slider("Clockwise probability", 0.0, 1.0, 0.5, step=0.05, key="stats_cw")
+            ccw_prob_stats = 1.0 - cw_prob_stats
+        with col3:
+            st.metric("Counter-clockwise", f"{ccw_prob_stats:.0%}")
+        
+        if st.button("RUN SIMULATIONS", use_container_width=True):
+            sim = LadybugSimulator(clockwise_prob=cw_prob_stats)
             
-            with st.spinner("Running 50,000 simulations... this takes a moment"):
-                results = sim.batch_simulate(50000)
+            with st.spinner(f"Running {n_stats:,} simulations... this takes a moment"):
+                results = sim.batch_simulate(n_stats)
             
             st.subheader("Results")
             
             # Key finding for position 6
-            prob_6 = results[6] / 50000
+            prob_6 = results[6] / n_stats
             
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -488,11 +502,11 @@ def main():
             st.divider()
             
             # Full distribution table
-            st.subheader("Complete Distribution (50,000 runs)")
+            st.subheader(f"Complete Distribution ({n_stats:,} runs)")
             
             dist_data = []
             for pos in sorted(results.keys()):
-                prob = results[pos] / 50000
+                prob = results[pos] / n_stats
                 dist_data.append({
                     'Position': pos,
                     'Count': results[pos],
@@ -507,17 +521,17 @@ def main():
             
             fig, ax = plt.subplots(figsize=(12, 6))
             positions = sorted(results.keys())
-            probabilities = [results[p]/50000 for p in positions]
+            probabilities = [results[p]/n_stats for p in positions]
             
             colors = ['red' if p == 6 else 'steelblue' for p in positions]
             ax.bar(positions, probabilities, color=colors, edgecolor='black', alpha=0.7, label='Simulated')
             
             # Theoretical line
-            ax.axhline(y=1/11, color='green', linestyle='--', linewidth=2, label='Theoretical (1/11)')
+            ax.axhline(y=1/11, color='green', linestyle='--', linewidth=2, label='Theoretical (50-50)')
             
             ax.set_xlabel('Position', fontsize=12)
             ax.set_ylabel('Probability', fontsize=12)
-            ax.set_title('Probability Distribution (50,000 Simulations)', fontsize=14, fontweight='bold')
+            ax.set_title(f'Probability Distribution ({n_stats:,} Simulations)', fontsize=14, fontweight='bold')
             ax.set_xticks(range(1, 13))
             ax.legend(fontsize=11)
             ax.grid(axis='y', alpha=0.3)
