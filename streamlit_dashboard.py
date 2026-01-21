@@ -60,8 +60,8 @@ class LadybugClockVisualizer:
         self.num_positions = num_positions
         self.start_position = start_position
         
-    def create_clock_figure(self, visited_positions, current_position, last_position=None, title="Clock Face"):
-        """Create clock visualization"""
+    def create_clock_figure(self, visited_positions, current_position, last_position=None, title="Clock Face", prev_position=None, direction_label=""):
+        """Create clock visualization with annotations"""
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         
         # Draw circle
@@ -96,11 +96,45 @@ class LadybugClockVisualizer:
             label_y = y * 1.2
             ax.text(label_x, label_y, str(i), fontsize=14, ha='center', va='center', fontweight='bold')
         
-        # Draw current position
+        # Draw arrow from previous position to current position
+        if prev_position is not None:
+            prev_angle = np.pi/2 - prev_position * 2 * np.pi / self.num_positions
+            curr_angle = np.pi/2 - current_position * 2 * np.pi / self.num_positions
+            
+            prev_x = np.cos(prev_angle)
+            prev_y = np.sin(prev_angle)
+            curr_x = np.cos(curr_angle)
+            curr_y = np.sin(curr_angle)
+            
+            # Draw arrow
+            dx = curr_x - prev_x
+            dy = curr_y - prev_y
+            ax.arrow(prev_x, prev_y, dx*0.7, dy*0.7, head_width=0.1, head_length=0.08, 
+                    fc='orange', ec='orange', linewidth=2.5, zorder=8, alpha=0.8)
+            
+            # Add direction label
+            if direction_label:
+                mid_x = (prev_x + curr_x) / 2
+                mid_y = (prev_y + curr_y) / 2
+                ax.text(mid_x, mid_y + 0.15, direction_label, fontsize=11, ha='center', 
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                       fontweight='bold', zorder=9)
+        
+        # Draw current position highlight
         current_angle = np.pi/2 - current_position * 2 * np.pi / self.num_positions
         x = np.cos(current_angle)
         y = np.sin(current_angle)
         ax.text(x, y, 'L', fontsize=40, ha='center', va='center', zorder=10, color='red', fontweight='bold')
+        
+        # Add legend
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='blue', edgecolor='black', label='Start (12)'),
+            Patch(facecolor='green', edgecolor='black', label='Visited'),
+            Patch(facecolor='lightgray', edgecolor='black', label='Not Visited'),
+            Patch(facecolor='red', edgecolor='black', label='Last Position')
+        ]
+        ax.legend(handles=legend_elements, loc='upper left', fontsize=10)
         
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
@@ -169,21 +203,30 @@ class LadybugClockVisualizer:
 class LadybugSimulator:
     """Simulates the random walk"""
     
-    def __init__(self, num_positions=12, start_position=12):
+    def __init__(self, num_positions=12, start_position=12, clockwise_prob=0.5):
         self.num_positions = num_positions
         self.start_position = start_position
+        self.clockwise_prob = clockwise_prob  # Probability of moving clockwise
+        self.counter_clockwise_prob = 1 - clockwise_prob
     
     def simulate(self, steps_limit=None):
         """Run one complete simulation"""
         current_pos = self.start_position
         visited = {current_pos}
         path = [current_pos]
+        directions = []  # Track directions for annotation
         
         while len(visited) < self.num_positions:
-            direction = random.choice([-1, 1])
+            # Choose direction based on probability
+            if random.random() < self.clockwise_prob:
+                direction = 1  # Clockwise
+            else:
+                direction = -1  # Counter-clockwise
+            
             current_pos = ((current_pos - 1 + direction) % self.num_positions) + 1
             visited.add(current_pos)
             path.append(current_pos)
+            directions.append(direction)
             
             if steps_limit and len(path) > steps_limit:
                 break
@@ -192,7 +235,8 @@ class LadybugSimulator:
             'last_position': current_pos,
             'path': path,
             'visited': visited,
-            'steps': len(path) - 1
+            'steps': len(path) - 1,
+            'directions': directions
         }
     
     def batch_simulate(self, n_simulations):
@@ -227,43 +271,80 @@ def main():
         st.header("Live Simulation - Watch Step by Step")
         
         st.write("""
-        Click the button below to watch the ladybug move step-by-step on the clock. 
-        The animation shows each move as it happens in real-time.
+        Watch the ladybug move step-by-step on the clock with arrows and annotations showing each move.
+        Adjust the probability settings to change movement patterns!
         """)
         
+        # Probability controls
+        st.subheader("Movement Probability Settings")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            clockwise_prob = st.slider(
+                "Clockwise Probability",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.5,
+                step=0.05,
+                help="Probability of moving clockwise (0 = always counter-clockwise, 1 = always clockwise)"
+            )
+        
+        with col2:
+            counter_prob = 1 - clockwise_prob
+            st.metric("Counter-Clockwise Probability", f"{counter_prob:.1%}")
+        
+        st.info(f"⚙️ Clockwise: {clockwise_prob:.1%} | Counter-Clockwise: {counter_prob:.1%}")
+        
         if st.button("START LIVE SIMULATION", key="run_live_anim", use_container_width=True):
-            # Run simulation and get path
-            sim = LadybugSimulator()
+            # Run simulation with custom probability
+            sim = LadybugSimulator(clockwise_prob=clockwise_prob)
             result = sim.simulate()
             path = result['path']
+            directions = result['directions']
             
             # Create a placeholder for animation
             clock_placeholder = st.empty()
             info_placeholder = st.empty()
             
-            # Animate step by step
+            # Animate step by step with annotations
             for step_num in range(len(path)):
                 current_pos = path[step_num]
                 visited_so_far = set(path[:step_num+1])
                 
-                # Create visualization for current step
+                # Get direction label
+                if step_num < len(directions):
+                    direction = directions[step_num]
+                    direction_label = "↻ CW" if direction == 1 else "↺ CCW"
+                else:
+                    direction_label = ""
+                
+                prev_pos = path[step_num - 1] if step_num > 0 else None
+                
+                # Create visualization for current step with annotations
                 viz = LadybugClockVisualizer()
                 fig = viz.create_clock_figure(
                     visited_so_far,
                     current_pos,
                     result['last_position'] if step_num == len(path) - 1 else None,
-                    f"Step {step_num}: At Position {current_pos}"
+                    f"Step {step_num}: At Position {current_pos}",
+                    prev_position=prev_pos,
+                    direction_label=direction_label
                 )
                 
                 # Update visualization
                 clock_placeholder.pyplot(fig)
                 
-                # Update info
+                # Update info with detailed annotation
                 visited_count = len(visited_so_far)
-                info_text = f"**Step {step_num}** | Current Position: **{current_pos}** | Visited: {visited_count}/12 | {', '.join(map(str, sorted(visited_so_far)))}"
+                if step_num < len(directions):
+                    move_desc = f"Moved {direction_label} from {prev_pos} to {current_pos}"
+                else:
+                    move_desc = f"Started at position {current_pos}"
+                
+                info_text = f"**Step {step_num}** | {move_desc} | Visited: {visited_count}/12 | Positions: {', '.join(map(str, sorted(visited_so_far)))}"
                 info_placeholder.info(info_text)
                 
-                # Small delay for animation effect
+                # Delay for animation
                 time.sleep(0.15)
             
             st.divider()
@@ -271,42 +352,44 @@ def main():
             # Final summary
             st.subheader("Simulation Complete!")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Steps", result['steps'])
             with col2:
                 st.metric("Last Position", result['last_position'])
             with col3:
-                st.metric("Probability if Pos 6", "9.09%")
+                st.metric("Clockwise Moves", sum(1 for d in directions if d == 1))
+            with col4:
+                st.metric("CCW Moves", sum(1 for d in directions if d == -1))
             
-            st.subheader("Full Path Trace")
-            path_display = " → ".join(map(str, path))
+            st.subheader("Full Path Trace with Annotations")
+            
+            # Create annotated path display
+            path_display = f"Start: {path[0]}"
+            for i, (pos, direction) in enumerate(zip(path[1:], directions)):
+                dir_symbol = "→" if direction == 1 else "←"
+                path_display += f" {dir_symbol} {pos}"
+            
             st.code(path_display, language="text")
         
         st.divider()
-        st.subheader("Compare Multiple Runs")
+        st.subheader("Compare Multiple Runs with Same Settings")
         
         col1, col2 = st.columns(2)
         with col1:
-            n_compare = st.slider("Number of runs to compare", 5, 50, 10)
+            n_compare = st.slider("Number of runs to compare", 5, 50, 10, key="compare_slider")
         
         if st.button("COMPARE RUNS", use_container_width=True):
-            sim = LadybugSimulator()
-            comparison_data = []
+            sim = LadybugSimulator(clockwise_prob=clockwise_prob)
             last_pos_counts = defaultdict(int)
             
             progress_bar = st.progress(0)
             for i in range(n_compare):
                 result = sim.simulate()
-                comparison_data.append({
-                    'Run': i + 1,
-                    'Steps': result['steps'],
-                    'Last Position': result['last_position']
-                })
                 last_pos_counts[result['last_position']] += 1
                 progress_bar.progress((i + 1) / n_compare)
             
-            st.subheader(f"Results from {n_compare} Runs")
+            st.subheader(f"Results from {n_compare} Runs (CW: {clockwise_prob:.1%})")
             
             col1, col2 = st.columns(2)
             
@@ -322,10 +405,11 @@ def main():
                 fig, ax = plt.subplots(figsize=(8, 5))
                 positions = sorted(last_pos_counts.keys())
                 counts = [last_pos_counts[p] for p in positions]
-                ax.bar(positions, counts, color='steelblue', edgecolor='black', alpha=0.7)
+                colors = ['red' if p == 6 else 'steelblue' for p in positions]
+                ax.bar(positions, counts, color=colors, edgecolor='black', alpha=0.7)
                 ax.set_xlabel('Last Position')
                 ax.set_ylabel('Frequency')
-                ax.set_title(f'Last Position Distribution ({n_compare} runs)')
+                ax.set_title(f'Distribution ({n_compare} runs, CW: {clockwise_prob:.1%})')
                 ax.set_xticks(range(1, 13))
                 ax.grid(axis='y', alpha=0.3)
                 st.pyplot(fig)
