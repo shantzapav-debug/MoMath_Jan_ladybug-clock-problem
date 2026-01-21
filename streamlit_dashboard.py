@@ -227,77 +227,108 @@ def main():
         st.header("Live Simulation - Watch Step by Step")
         
         st.write("""
-        Click the button below to run a live simulation. The ladybug starts at position 12 
-        and randomly moves to neighboring positions (clockwise or counterclockwise) until 
-        all 12 numbers are visited.
+        Click the button below to watch the ladybug move step-by-step on the clock. 
+        The animation shows each move as it happens in real-time.
         """)
         
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.subheader("Simulation Controls")
+        if st.button("START LIVE SIMULATION", key="run_live_anim", use_container_width=True):
+            # Run simulation and get path
+            sim = LadybugSimulator()
+            result = sim.simulate()
+            path = result['path']
             
-            if st.button("RUN SIMULATION", key="run_live", use_container_width=True):
-                sim = LadybugSimulator()
-                result = sim.simulate()
+            # Create a placeholder for animation
+            clock_placeholder = st.empty()
+            info_placeholder = st.empty()
+            
+            # Animate step by step
+            for step_num in range(len(path)):
+                current_pos = path[step_num]
+                visited_so_far = set(path[:step_num+1])
                 
-                st.subheader("Results")
-                
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.metric("Total Steps", result['steps'])
-                with col_b:
-                    st.metric("Last Position", result['last_position'])
-                with col_c:
-                    st.metric("Positions Visited", len(result['visited']))
-                
-                st.subheader("Path Taken")
-                path_str = ' → '.join(map(str, result['path'][:25]))
-                if len(result['path']) > 25:
-                    path_str += f" ... +{len(result['path']) - 25} more"
-                st.text(path_str)
-                
-                st.subheader("All Positions Visited")
-                st.write(f"Order of visits: {', '.join(map(str, result['path']))}")
-        
-        with col2:
-            st.subheader("Clock Visualization")
-            if st.button("VISUALIZE", key="viz_live", use_container_width=True):
-                sim = LadybugSimulator()
-                result = sim.simulate()
-                
+                # Create visualization for current step
                 viz = LadybugClockVisualizer()
                 fig = viz.create_clock_figure(
-                    result['visited'],
-                    result['last_position'],
-                    result['last_position'],
-                    f"Final Result: Position {result['last_position']} was Last!"
+                    visited_so_far,
+                    current_pos,
+                    result['last_position'] if step_num == len(path) - 1 else None,
+                    f"Step {step_num}: At Position {current_pos}"
                 )
-                st.pyplot(fig)
                 
-                st.success(f"Simulation completed in {result['steps']} steps!")
+                # Update visualization
+                clock_placeholder.pyplot(fig)
+                
+                # Update info
+                visited_count = len(visited_so_far)
+                info_text = f"**Step {step_num}** | Current Position: **{current_pos}** | Visited: {visited_count}/12 | {', '.join(map(str, sorted(visited_so_far)))}"
+                info_placeholder.info(info_text)
+                
+                # Small delay for animation effect
+                time.sleep(0.15)
+            
+            st.divider()
+            
+            # Final summary
+            st.subheader("Simulation Complete!")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Steps", result['steps'])
+            with col2:
+                st.metric("Last Position", result['last_position'])
+            with col3:
+                st.metric("Probability if Pos 6", "9.09%")
+            
+            st.subheader("Full Path Trace")
+            path_display = " → ".join(map(str, path))
+            st.code(path_display, language="text")
         
         st.divider()
+        st.subheader("Compare Multiple Runs")
         
-        st.subheader("Multiple Runs Comparison")
-        if st.button("Compare 10 Simulations", use_container_width=True):
-            results_list = []
-            last_positions = defaultdict(int)
+        col1, col2 = st.columns(2)
+        with col1:
+            n_compare = st.slider("Number of runs to compare", 5, 50, 10)
+        
+        if st.button("COMPARE RUNS", use_container_width=True):
+            sim = LadybugSimulator()
+            comparison_data = []
+            last_pos_counts = defaultdict(int)
             
             progress_bar = st.progress(0)
-            for i in range(10):
-                sim = LadybugSimulator()
+            for i in range(n_compare):
                 result = sim.simulate()
-                results_list.append(result)
-                last_positions[result['last_position']] += 1
-                progress_bar.progress((i + 1) / 10)
+                comparison_data.append({
+                    'Run': i + 1,
+                    'Steps': result['steps'],
+                    'Last Position': result['last_position']
+                })
+                last_pos_counts[result['last_position']] += 1
+                progress_bar.progress((i + 1) / n_compare)
             
-            st.subheader("Results from 10 Runs")
+            st.subheader(f"Results from {n_compare} Runs")
             
-            for pos in sorted(last_positions.keys()):
-                count = last_positions[pos]
-                pct = (count / 10) * 100
-                st.write(f"Position {pos}: {count} times ({pct:.0f}%)")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Distribution of Last Positions:**")
+                for pos in sorted(last_pos_counts.keys()):
+                    count = last_pos_counts[pos]
+                    pct = (count / n_compare) * 100
+                    st.write(f"Position {pos}: {count} ({pct:.0f}%)")
+            
+            with col2:
+                # Chart
+                fig, ax = plt.subplots(figsize=(8, 5))
+                positions = sorted(last_pos_counts.keys())
+                counts = [last_pos_counts[p] for p in positions]
+                ax.bar(positions, counts, color='steelblue', edgecolor='black', alpha=0.7)
+                ax.set_xlabel('Last Position')
+                ax.set_ylabel('Frequency')
+                ax.set_title(f'Last Position Distribution ({n_compare} runs)')
+                ax.set_xticks(range(1, 13))
+                ax.grid(axis='y', alpha=0.3)
+                st.pyplot(fig)
     
     # MODE 2: BATCH SIMULATIONS
     elif mode == "Batch Simulations":
