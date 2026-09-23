@@ -1,0 +1,13 @@
+{
+  "name": "Ladybug Clock Problem",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "streamlit-dashboard",
+      "command": "bash .cursor/run_dashboard.sh"
+    }
+  ],
+  "ports": [
+    8501
+  ]
+}
